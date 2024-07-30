@@ -2,13 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
-import { db } from '../../firebase'; // firebase.js を正しくインポート
+import { db } from '../../firebase';
 import { useAuth } from '../context/AuthContext'; // 正しいパスを指定
 
 export default function Chat() {
-    const { user } = useAuth(); // useAuthからuserを取得
-    console.log("Chatコンポーネント内のユーザー:", user);
-
+    const { user } = useAuth();
     const [posts, setPosts] = useState([]);
 
     useEffect(() => {
@@ -20,18 +18,18 @@ export default function Chat() {
     }, []);
 
     return (
-        <div className="container mx-auto p-4">
-            <h1>チャット</h1>
+        <div className="container mx-auto p-4 min-h-screen bg-blue-400">
             <div className="space-y-4">
                 {posts.map((post) => (
                     <div
                         key={post.id}
-                        className={`p-4 rounded-lg ${post.userId === user?.uid ? 'bg-blue-100 text-right ml-auto' : 'bg-gray-100 text-left mr-auto'}`}
+                        className={`p-4 rounded-lg text-black ${post.userId === user?.uid ? 'bg-green-400 ml-auto text-left' : 'bg-white mr-auto text-left'}`}
                         style={{ maxWidth: '75%' }}
                     >
-                        <p>{post.text}</p>
-                        <p className="font-bold">{post.response}</p>
-                        <p className="text-sm text-gray-500">{new Date(post.timestamp.toDate()).toLocaleString()}</p>
+                        <p className="font-semibold">{post.userName}</p> {/* ユーザー名を表示 */}
+                        {/* <p>{post.text}</p> */}
+                        <p className="font-bold mt-2">{post.response}</p>
+                        {/* <p className="text-sm text-gray-500 mt-1">{new Date(post.timestamp.toDate()).toLocaleString()}</p> */}
                     </div>
                 ))}
             </div>

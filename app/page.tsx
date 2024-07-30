@@ -79,7 +79,6 @@ export default function Home() {
 
     return (
         <div className="container h-screen w-screen mx-auto p-4 bg-sky-500 bg-cover bg-center" style={{ backgroundImage: `url(${bg.src})` }}>
-            <h1 className='text-center'>ぐちタイプAI</h1>
             {!user ? (
                 <div className='flex h-3/4 justify-center items-center'>
                     <div className='block'>
@@ -132,7 +131,7 @@ export default function Home() {
                                     </button>
                                     {mediaBlobUrl && <audio src={mediaBlobUrl} controls />}
                                     <p>録音結果: {recordedText}</p>
-                                    <p>AIの予測: {prediction}</p>
+                                    {/* <p>AIの予測: {prediction}</p> */}
                                 </div>
                             )}
                         />
