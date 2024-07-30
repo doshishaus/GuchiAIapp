@@ -10,7 +10,7 @@ export default function Chat() {
     const [posts, setPosts] = useState([]);
 
     useEffect(() => {
-        const q = query(collection(db, "posts"), orderBy("timestamp", "desc"));
+        const q = query(collection(db, "posts"), orderBy("timestamp", "asc"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         });
