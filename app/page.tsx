@@ -1,113 +1,149 @@
-import Image from "next/image";
+"use client";
+
+import { useAuth } from './context/AuthContext';
+import { useState, useCallback, useMemo } from 'react';
+import axios from 'axios';
+import dynamic from 'next/dynamic';
+import Link from 'next/link';
+import Image from 'next/image';
+import bg from "@/public/bg-top.png";
+import topimg from "@/public/topicon.png";
+import talkicon from "@/public/talkicon.png";
+
+
+const ReactMediaRecorder = dynamic(
+    () => import('react-media-recorder').then(mod => mod.ReactMediaRecorder),
+    { ssr: false }
+);
+
+const mbtiTypes = [
+    "INTJ", "INTP", "ENTJ", "ENTP", "INFJ", "INFP", "ENFJ", "ENFP",
+    "ISTJ", "ISFJ", "ESTJ", "ESFJ", "ISTP", "ISFP", "ESTP", "ESFP"
+];
 
 export default function Home() {
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:size-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{" "}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
+    const { user, login, logout } = useAuth();
+    const [mbti, setMbti] = useState("");
+    const [recordedText, setRecordedText] = useState("");
+    const [prediction, setPrediction] = useState("");
+    const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleSave = useCallback(async () => {
+        if (mbti) {
+            try {
+                await axios.post('/api/saveMBTI', { userId: user.uid, mbti });
+                alert('MBTIタイプが保存されました');
+            } catch (error) {
+                console.error('MBTIタイプの保存エラー:', error);
+                alert('MBTIタイプの保存に失敗しました');
+            }
+        } else {
+            alert('MBTIタイプを選択してください');
+        }
+    }, [mbti, user]);
+
+    const handleRecord = useCallback(async () => {
+        if (audioBlob) {
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'audio.webm');
+
+            try {
+                console.log('音声を /api/speechToText に送信');
+                const response = await axios.post('/api/speechToText', formData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                    },
+                });
+                const { transcript } = response.data;
+                console.log('テキスト変換結果受信:', transcript);
+                setRecordedText(transcript);
+
+                // Vertex AIに送信
+                console.log('テキストを /api/vertexAI に送信');
+                const aiResponse = await axios.post('/api/vertexAI', { text: transcript, mbti, userId: user.uid, userName: user.displayName });
+                console.log('Vertex AIからのレスポンス受信:', aiResponse.data.response);
+                setPrediction(aiResponse.data.response);
+            } catch (error: any) {
+                console.error('音声処理エラー:', error);
+                setError('音声処理エラー: ' + (error.response?.data?.details || error.message));
+            }
+        } else {
+            setError('録音された音声がありません');
+        }
+    }, [audioBlob, mbti]);
+
+    const mbtiOptions = useMemo(() => mbtiTypes.map((type) => (
+        <option key={type} value={type}>{type}</option>
+    )), []);
+
+    return (
+        <div className="container h-screen w-screen mx-auto p-4 bg-sky-500 bg-cover bg-center" style={{ backgroundImage: `url(${bg.src})` }}>
+            <h1 className='text-center'>ぐちタイプAI</h1>
+            {!user ? (
+                <div className='flex h-3/4 justify-center items-center'>
+                    <div className='block'>
+                        <Image src={topimg} alt='アイコン' width={400} height={400} />
+                        <div className="flex w-fit rounded-full mx-auto">
+                            <button onClick={login} className="bg-slate-100 text-black p-4 font-black font-sans text-2xl rounded-3xl shadow-lg transform transition-transform hover:scale-105 hover:shadow-2xl">
+                                LOGIN(Google)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <div>
+                    <div className='flex justify-evenly items-center'>
+                        <button onClick={logout} className="bg-yellow-500 text-white p-2 rounded-full w-10">
+                            ＜
+                        </button>
+                        <p>こんにちは、{user.displayName}さん</p>
+                    </div>
+                    <Image src={talkicon} alt='アイコン' width={400} height={400} className='mx-auto' />
+
+                    <div className="mt-4 text-center">
+                        <select
+                            value={mbti} onChange={(e) => setMbti(e.target.value)} className="border p-2 rounded text-black font-bold">
+                            <option value="">MBTIタイプを選択</option>
+                            {mbtiOptions}
+                        </select>
+                        <button onClick={handleSave} className="bg-blue-500 text-white p-2 rounded mt-2">
+                            保存
+                        </button>
+                    </div>
+                    <div className="mt-4">
+
+                        {error && <p className="text-red-500">{error}</p>}
+                        <ReactMediaRecorder
+                            audio
+                            blobPropertyBag={{ type: 'audio/webm' }}
+                            onStop={(blobUrl, blob) => setAudioBlob(blob)}
+                            render={({ startRecording, stopRecording, mediaBlobUrl }) => (
+                                <div className='text-center'>
+                                    <button onClick={startRecording} className="bg-green-500 text-white p-2 rounded-md w-10 transform transition-transform duration-150 active:scale-95">
+                                        ▶️
+                                    </button>
+                                    <button onClick={stopRecording} className="bg-red-500 text-white p-2 rounded-md w-10 ml-2 transform transition-transform duration-150 active:scale-95">
+                                        ◼️
+                                    </button>
+
+                                    <button onClick={handleRecord} className="bg-blue-500 text-white p-2 rounded-md ml-2 font-sans">
+                                        ぐちを生成/投稿
+                                    </button>
+                                    {mediaBlobUrl && <audio src={mediaBlobUrl} controls />}
+                                    <p>録音結果: {recordedText}</p>
+                                    <p>AIの予測: {prediction}</p>
+                                </div>
+                            )}
+                        />
+                        <div className='text-center'>
+                            <Link href="/chat" className='block'>
+                                <button className="bg-blue-500 text-white p-2 rounded mt-4">チャットページへ</button>
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
-      </div>
-
-      <div className="relative z-[-1] flex place-items-center before:absolute before:h-[300px] before:w-full before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-full after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 sm:before:w-[480px] sm:after:w-[240px] before:lg:h-[360px]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:mb-0 lg:w-full lg:max-w-5xl lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Docs{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Learn{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Templates{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Explore starter templates for Next.js.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Deploy{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-balance text-sm opacity-50">
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
-  );
+    );
 }
